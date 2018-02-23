@@ -1,3 +1,4 @@
+image:https://travis-ci.org/dvoros/sqoop.svg?branch=travis["Build Status", link="https://travis-ci.org/dvoros/sqoop"]
 
 = Welcome to Sqoop!
 
@@ -41,6 +42,6 @@ See the COMPILING.txt document for for information.
 
 == This is also an Asciidoc file!
 
-* Try running +asciidoc README.txt+
+* Try running +asciidoc README.asciidoc+
 * For more information about asciidoc, see http://www.methods.co.nz/asciidoc/
 
