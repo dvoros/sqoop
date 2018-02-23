@@ -23,6 +23,6 @@ cache:
   directories:
     - $HOME/.ivy2
 
-install: true
+install: ant clean jar-all
 
-script: ant clean jar-all
+script: ant test
