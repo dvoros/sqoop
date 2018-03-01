@@ -63,6 +63,7 @@ public class HiveImport {
   private Configuration configuration;
   private boolean generateOnly;
   private static boolean testMode = false;
+  private static boolean failInTestMode = false;
 
   public static boolean getTestMode() {
     return testMode;
@@ -70,6 +71,10 @@ public class HiveImport {
 
   public static void setTestMode(boolean mode) {
     testMode = mode;
+  }
+
+  public static void setFailInTestMode(boolean failInTestMode) {
+    HiveImport.failInTestMode = failInTestMode;
   }
 
   /** Entry point through which Hive invocation should be attempted. */
@@ -302,6 +307,11 @@ public class HiveImport {
     SubprocessSecurityManager subprocessSM = null;
 
     if (testMode) {
+      // Throw if test expects Hive process to fail
+      if (failInTestMode) {
+        throw new IOException("Failing in test mode.");
+      }
+
       // We use external mock hive process for test mode as
       // HCatalog dependency would have brought in Hive classes.
       LOG.debug("Using external Hive process in test mode.");
