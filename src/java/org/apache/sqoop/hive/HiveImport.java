@@ -25,6 +25,8 @@ import java.io.OutputStreamWriter;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
@@ -320,7 +322,9 @@ public class HiveImport {
     }
 
     try {
-      Class cliDriverClass = Class.forName(HIVE_MAIN_CLASS);
+      // Classloader isolation, since Hive is going to pollute its classloader
+      ClassLoader cl = new URLClassLoader(new URL[]{}, ClassLoader.getSystemClassLoader().getParent());
+      Class cliDriverClass = Class.forName(HIVE_MAIN_CLASS, true, cl);
 
       // We loaded the CLI Driver in this JVM, so we will just
       // call it in-process. The CliDriver class has a method:
