@@ -25,6 +25,8 @@ import java.io.OutputStreamWriter;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
@@ -63,6 +65,7 @@ public class HiveImport {
   private Configuration configuration;
   private boolean generateOnly;
   private static boolean testMode = false;
+  private static boolean failInTestMode = false;
 
   public static boolean getTestMode() {
     return testMode;
@@ -70,6 +73,10 @@ public class HiveImport {
 
   public static void setTestMode(boolean mode) {
     testMode = mode;
+  }
+
+  public static void setFailInTestMode(boolean failInTestMode) {
+    HiveImport.failInTestMode = failInTestMode;
   }
 
   /** Entry point through which Hive invocation should be attempted. */
@@ -302,6 +309,11 @@ public class HiveImport {
     SubprocessSecurityManager subprocessSM = null;
 
     if (testMode) {
+      // Throw if test expects Hive process to fail
+      if (failInTestMode) {
+        throw new IOException("Failing in test mode.");
+      }
+
       // We use external mock hive process for test mode as
       // HCatalog dependency would have brought in Hive classes.
       LOG.debug("Using external Hive process in test mode.");
@@ -310,7 +322,9 @@ public class HiveImport {
     }
 
     try {
-      Class cliDriverClass = Class.forName(HIVE_MAIN_CLASS);
+      // Classloader isolation, since Hive is going to pollute its classloader
+      ClassLoader cl = new URLClassLoader(new URL[]{}, ClassLoader.getSystemClassLoader().getParent());
+      Class cliDriverClass = Class.forName(HIVE_MAIN_CLASS, true, cl);
 
       // We loaded the CLI Driver in this JVM, so we will just
       // call it in-process. The CliDriver class has a method:
