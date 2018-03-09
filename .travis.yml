@@ -19,11 +19,21 @@ language: java
 jdk:
   - oraclejdk8
 
+env:
+  - TEST_SUITE=-Dnon-thirdparty=true
+  - TEST_SUITE=-Dthirdparty=true
+
 cache:
   directories:
     - $HOME/.ivy2
+    - $HOME/jdbc
 
 # No dependencies needed
 install: true
 
-script: ant test
+before_script:
+  - mkdir -p "$HOME/jdbc"
+  - wget -nc -q --directory-prefix "$HOME/jdbc" $JDBC_CUBRID_URL $JDBC_DB2_URL $JDBC_MSSQL_URL $JDBC_MYSQL_URL $JDBC_ORACLE_URL $JDBC_POSTGRESQL_URL
+  - ls "$HOME/jdbc"
+
+script: ant -Dsqoop.thirdparty.lib.dir=$HOME/jdbc -Dsqoop.test.mysql.connectstring.host_url=jdbc:mysql://$SQOOP_DB_HOST:3306/ -Dsqoop.test.mysql.databasename=sqoop -Dsqoop.test.mysql.password=$SQOOP_DB_PASSWORD -Dsqoop.test.mysql.username=sqoop -Dsqoop.test.oracle.connectstring=jdbc:oracle:thin:@//$SQOOP_DB_HOST:1521/sqoop -Dsqoop.test.oracle.username=SYSTEM -Dsqoop.test.oracle.password=$SQOOP_DB_PASSWORD -Dsqoop.test.postgresql.connectstring.host_url=jdbc:postgresql://$SQOOP_DB_HOST/ -Dsqoop.test.postgresql.database=sqoop -Dsqoop.test.postgresql.username=sqoop -Dsqoop.test.postgresql.password=$SQOOP_DB_PASSWORD -Dsqoop.test.cubrid.connectstring.host_url=jdbc:cubrid:$SQOOP_DB_HOST:33000 -Dsqoop.test.cubrid.connectstring.username=sqoop -Dsqoop.test.cubrid.connectstring.database=sqoop -Dsqoop.test.cubrid.connectstring.password=$SQOOP_DB_PASSWORD -Dmapred.child.java.opts="\-Djava.security.egd=file:/dev/../dev/urandom" -Dtest.timeout=10000000 -Dsqoop.test.sqlserver.connectstring.host_url=jdbc:sqlserver://$SQOOP_DB_HOST:1433 -Dsqoop.test.sqlserver.database=master -Dms.sqlserver.username=sa -Dms.sqlserver.password=$SQOOP_DB_PASSWORD -Dsqoop.test.db2.connectstring.host_url=jdbc:db2://$SQOOP_DB_HOST:50000 -Dsqoop.test.db2.connectstring.database=SQOOP -Dsqoop.test.db2.connectstring.username=DB2INST1 -Dsqoop.test.db2.connectstring.password=$SQOOP_DB_PASSWORD $TEST_SUITE test
