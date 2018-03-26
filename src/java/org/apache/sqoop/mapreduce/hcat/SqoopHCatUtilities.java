@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.security.Policy;
 import java.sql.Types;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -1205,6 +1206,7 @@ public final class SqoopHCatUtilities {
       Class<?> cliDriverClass = Class.forName(HCAT_CLI_MAIN_CLASS);
       subprocessSM = new SubprocessSecurityManager();
       subprocessSM.install();
+      Policy.setPolicy(new DerbyPolicy());
       Method mainMethod = cliDriverClass.getMethod("main", argv.getClass());
       mainMethod.invoke(null, (Object) argv);
     } catch (ClassNotFoundException cnfe) {
@@ -1230,6 +1232,7 @@ public final class SqoopHCatUtilities {
       if (null != subprocessSM) {
         subprocessSM.uninstall();
       }
+      Policy.setPolicy(null);
       Thread.currentThread().setContextClassLoader(originalClassLoader);
     }
   }
