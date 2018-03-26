@@ -25,6 +25,7 @@ import java.io.OutputStreamWriter;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.security.Policy;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
@@ -34,6 +35,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.util.Shell;
+import org.apache.sqoop.mapreduce.hcat.DerbyPolicy;
 import org.apache.sqoop.util.Executor;
 import org.apache.sqoop.util.LoggingAsyncSink;
 import org.apache.sqoop.util.SubprocessSecurityManager;
@@ -260,6 +262,8 @@ public class HiveImport implements HiveClient {
       subprocessSM = new SubprocessSecurityManager();
       subprocessSM.install();
 
+      Policy.setPolicy(new DerbyPolicy());
+
       String[] argv = getHiveArgs("-f", filename);
 
       // And invoke the static method on this array.
@@ -297,6 +301,7 @@ public class HiveImport implements HiveClient {
       if (null != subprocessSM) {
         // Uninstall the SecurityManager used to trap System.exit().
         subprocessSM.uninstall();
+        Policy.setPolicy(null);
       }
     }
   }
