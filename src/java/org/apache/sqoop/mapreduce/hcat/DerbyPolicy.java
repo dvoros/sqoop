@@ -28,10 +28,11 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.Iterator;
+import java.util.List;
 
 /**
  *
- * Copied from Hive.
+ * Initially copied from Hive.
  *
  * A security policy that grants usederbyinternals
  *
@@ -66,25 +67,29 @@ public class DerbyPolicy extends Policy {
 
   class DerbyPermissionCollection extends PermissionCollection {
 
-    ArrayList<Permission> perms = new ArrayList<Permission>();
+    List<Permission> perms = new ArrayList<>();
 
+    @Override
     public void add(Permission p) {
       perms.add(p);
     }
 
+    @Override
     public boolean implies(Permission p) {
-      for (Iterator<Permission> i = perms.iterator(); i.hasNext();) {
-        if (((Permission) i.next()).implies(p)) {
+      for (Permission perm : perms) {
+        if (perm.implies(p)) {
           return true;
         }
       }
       return false;
     }
 
+    @Override
     public Enumeration<Permission> elements() {
       return Collections.enumeration(perms);
     }
 
+    @Override
     public boolean isReadOnly() {
       return false;
     }
