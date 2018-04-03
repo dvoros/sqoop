@@ -1200,6 +1200,7 @@ public final class SqoopHCatUtilities {
 
   void executeHCatProgramInProcess(String[] argv) throws IOException {
     SubprocessSecurityManager subprocessSM = null;
+    Policy originalPolicy = Policy.getPolicy();
     final ClassLoader originalClassLoader = Thread.currentThread().getContextClassLoader();
 
     try {
@@ -1232,7 +1233,7 @@ public final class SqoopHCatUtilities {
       if (null != subprocessSM) {
         subprocessSM.uninstall();
       }
-      Policy.setPolicy(null);
+      Policy.setPolicy(originalPolicy);
       Thread.currentThread().setContextClassLoader(originalClassLoader);
     }
   }

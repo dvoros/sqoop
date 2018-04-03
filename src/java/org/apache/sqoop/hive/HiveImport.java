@@ -238,6 +238,7 @@ public class HiveImport implements HiveClient {
   private void executeScript(String filename, List<String> env)
       throws IOException {
     SubprocessSecurityManager subprocessSM = null;
+    Policy originalPolicy = Policy.getPolicy();
 
     if (testMode) {
       // We use external mock hive process for test mode as
@@ -301,7 +302,7 @@ public class HiveImport implements HiveClient {
       if (null != subprocessSM) {
         // Uninstall the SecurityManager used to trap System.exit().
         subprocessSM.uninstall();
-        Policy.setPolicy(null);
+        Policy.setPolicy(originalPolicy);
       }
     }
   }
