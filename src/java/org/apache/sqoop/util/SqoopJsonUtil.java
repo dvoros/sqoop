@@ -33,6 +33,8 @@ import org.json.JSONObject;
 
 public class SqoopJsonUtil {
 
+  public static final String EMPTY_JSON_OBJECT = "{}";
+
   public static final Log LOG = LogFactory
     .getLog(SqoopJsonUtil.class.getName());
 
@@ -41,7 +43,7 @@ public class SqoopJsonUtil {
 
   public static String getJsonStringForMap(Map<String, String> map) {
     if (map == null) {
-      map = new HashMap<>();
+      return EMPTY_JSON_OBJECT;
     }
     JSONObject pathPartMap = new JSONObject(map);
     return pathPartMap.toString();
@@ -80,7 +82,7 @@ public class SqoopJsonUtil {
   }
 
   public static boolean isEmptyJSON(String jsonStr) {
-    if (null == jsonStr || "".equals(jsonStr) || "{}".equals(jsonStr)) {
+    if (null == jsonStr || "".equals(jsonStr) || EMPTY_JSON_OBJECT.equals(jsonStr)) {
       return true;
     } else {
       return false;
