@@ -97,7 +97,7 @@ under the License.
 
     <dependency org="log4j" name="log4j" rev="${log4j.version}"
       conf="common->master" />
-    <dependency org="org.apache.logging.log4j" name="log4j-api" rev="2.10.0"
+    <dependency org="org.apache.logging.log4j" name="log4j-api" rev="${log4j-api.version}"
       conf="common->master" />
     <dependency org="junit" name="junit" rev="${junit.version}"
       conf="test->default"/>
