@@ -39,7 +39,7 @@ public class SqoopJsonUtil {
   private SqoopJsonUtil() {
   }
 
-  public static String getJsonStringforMap(Map<String, String> map) {
+  public static String getJsonStringForMap(Map<String, String> map) {
     if (map == null) {
       map = new HashMap<>();
     }
@@ -47,7 +47,7 @@ public class SqoopJsonUtil {
     return pathPartMap.toString();
   }
 
-  public static Map<String, String> getMapforJsonString(String mapJsonStr) {
+  public static Map<String, String> getMapForJsonString(String mapJsonStr) {
     LOG.debug("Passed mapJsonStr ::" + mapJsonStr + " to parse");
     final Map<String, String> result;
     try {
