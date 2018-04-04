@@ -95,4 +95,3 @@ public class DerbyPolicy extends Policy {
     }
   }
 }
-
