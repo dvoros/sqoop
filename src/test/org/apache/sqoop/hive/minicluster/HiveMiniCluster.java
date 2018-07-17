@@ -23,6 +23,8 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.shims.HadoopShims;
+import org.apache.hadoop.hive.shims.ShimLoader;
 import org.apache.hive.service.Service;
 import org.apache.hive.service.server.HiveServer2;
 
@@ -79,6 +81,16 @@ public class HiveMiniCluster {
     config.set(HiveConf.ConfVars.HIVE_SERVER2_THRIFT_BIND_HOST.varname, getHostName());
     config.setInt(HiveConf.ConfVars.HIVE_SERVER2_THRIFT_PORT.varname, getPort());
     config.set(HiveConf.ConfVars.METASTORECONNECTURLKEY.varname, getMetastoreConnectUrl());
+    config.set(HiveConf.ConfVars.HIVE_EXECUTION_ENGINE.varname, "tez");
+    config.set(HiveConf.ConfVars.HIVE_JAR_DIRECTORY.varname, tempFolderPath);
+    config.setBoolVar(HiveConf.ConfVars.HIVE_SERVER2_ENABLE_DOAS, false);
+    config.setBoolVar(HiveConf.ConfVars.HIVE_IN_TEST, true);
+    config.setBoolVar(HiveConf.ConfVars.HIVE_IN_TEZ_TEST, true);
+
+
+    HadoopShims shims = ShimLoader.getHadoopShims();
+    HadoopShims.MiniMrShim mr1 = shims.getLocalMiniTezCluster(config, false);
+    mr1.setupConfiguration(config);
 
     for (Map.Entry<String, String> authConfig : authenticationConfiguration.getAuthenticationConfig().entrySet()) {
       config.set(authConfig.getKey(), authConfig.getValue());
