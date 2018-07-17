@@ -23,21 +23,20 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 import org.apache.sqoop.Sqoop;
 
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
-import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.sqoop.avro.AvroSchemaMismatchException;
-import org.apache.sqoop.mapreduce.ParquetJob;
+import org.apache.sqoop.mapreduce.parquet.kite.KiteParquetUtils;
+import org.apache.sqoop.util.ParquetReader;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -54,11 +53,8 @@ import org.apache.sqoop.tool.ImportTool;
 import org.apache.sqoop.tool.SqoopTool;
 import org.apache.commons.cli.ParseException;
 import org.junit.rules.ExpectedException;
-import org.kitesdk.data.Dataset;
-import org.kitesdk.data.DatasetReader;
-import org.kitesdk.data.Datasets;
-import org.kitesdk.data.Formats;
 
+import static java.util.Collections.sort;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -292,7 +288,7 @@ public class TestHiveImport extends ImportJobTestCase {
    * file. */
   @Test
   public void testNormalHiveImportAsParquet() throws IOException {
-    final String TABLE_NAME = "NORMAL_HIVE_IMPORT_AS_PARQUET";
+    final String TABLE_NAME = "normal_hive_import_as_parquet";
     setCurTableName(TABLE_NAME);
     setNumCols(3);
     String [] types = getTypes();
@@ -301,43 +297,39 @@ public class TestHiveImport extends ImportJobTestCase {
 
     runImportTest(TABLE_NAME, types, vals, "", getArgv(false, extraArgs),
         new ImportTool());
-    verifyHiveDataset(TABLE_NAME, new Object[][]{{"test", 42, "somestring"}});
+    verifyHiveDataset(new Object[][]{{"test", 42, "somestring"}});
   }
 
-  private void verifyHiveDataset(String tableName, Object[][] valsArray) {
-    String datasetUri = String.format("dataset:hive:default/%s",
-        tableName.toLowerCase());
-    assertTrue(Datasets.exists(datasetUri));
-    Dataset dataset = Datasets.load(datasetUri);
-    assertFalse(dataset.isEmpty());
+  private void verifyHiveDataset(Object[][] valsArray) {
+    List<String> expected = getExpectedLines(valsArray);
+    List<String> result = new ParquetReader(getTablePath()).readAllInCsv();
 
-    DatasetReader<GenericRecord> reader = dataset.newReader();
-    try {
-      List<String> expectations = new ArrayList<String>();
-      if (valsArray != null) {
-        for (Object[] vals : valsArray) {
-          expectations.add(Arrays.toString(vals));
-        }
-      }
+    sort(expected);
+    sort(result);
 
-      while (reader.hasNext() && expectations.size() > 0) {
-        String actual = Arrays.toString(
-            convertGenericRecordToArray(reader.next()));
-        assertTrue("Expect record: " + actual, expectations.remove(actual));
-      }
-      assertFalse(reader.hasNext());
-      assertEquals(0, expectations.size());
-    } finally {
-      reader.close();
-    }
+    assertEquals(expected, result);
   }
 
-  private static Object[] convertGenericRecordToArray(GenericRecord record) {
-    Object[] result = new Object[record.getSchema().getFields().size()];
-    for (int i = 0; i < result.length; i++) {
-      result[i] = record.get(i);
+  private List<String> getExpectedLines(Object[][] valsArray) {
+    List<String> expectations = new ArrayList<>();
+    if (valsArray != null) {
+      for (Object[] vals : valsArray) {
+        expectations.add(toCsv(vals));
+      }
     }
-    return result;
+    return expectations;
+  }
+
+  private String toCsv(Object[] vals) {
+    StringBuilder result = new StringBuilder();
+
+    for (Object val : vals) {
+      result.append(val).append(",");
+    }
+
+    result.deleteCharAt(result.length() - 1);
+
+    return result.toString();
   }
 
   /** Test that table is created in hive with no data import. */
@@ -379,7 +371,7 @@ public class TestHiveImport extends ImportJobTestCase {
    */
   @Test
   public void testCreateOverwriteHiveImportAsParquet() throws IOException {
-    final String TABLE_NAME = "CREATE_OVERWRITE_HIVE_IMPORT_AS_PARQUET";
+    final String TABLE_NAME = "create_overwrite_hive_import_as_parquet";
     setCurTableName(TABLE_NAME);
     setNumCols(3);
     String [] types = getTypes();
@@ -388,13 +380,13 @@ public class TestHiveImport extends ImportJobTestCase {
     ImportTool tool = new ImportTool();
 
     runImportTest(TABLE_NAME, types, vals, "", getArgv(false, extraArgs), tool);
-    verifyHiveDataset(TABLE_NAME, new Object[][]{{"test", 42, "somestring"}});
+    verifyHiveDataset(new Object[][]{{"test", 42, "somestring"}});
 
     String [] valsToOverwrite = { "'test2'", "24", "'somestring2'" };
     String [] extraArgsForOverwrite = {"--as-parquetfile", "--hive-overwrite"};
     runImportTest(TABLE_NAME, types, valsToOverwrite, "",
         getArgv(false, extraArgsForOverwrite), tool);
-    verifyHiveDataset(TABLE_NAME, new Object[][] {{"test2", 24, "somestring2"}});
+    verifyHiveDataset(new Object[][] {{"test2", 24, "somestring2"}});
   }
 
   @Test
@@ -412,7 +404,7 @@ public class TestHiveImport extends ImportJobTestCase {
     createTableWithColTypes(types, vals);
 
     thrown.expect(AvroSchemaMismatchException.class);
-    thrown.expectMessage(ParquetJob.INCOMPATIBLE_AVRO_SCHEMA_MSG + ParquetJob.HIVE_INCOMPATIBLE_AVRO_SCHEMA_MSG);
+    thrown.expectMessage(KiteParquetUtils.INCOMPATIBLE_AVRO_SCHEMA_MSG + KiteParquetUtils.HIVE_INCOMPATIBLE_AVRO_SCHEMA_MSG);
 
     SqoopOptions sqoopOptions = getSqoopOptions(getConf());
     sqoopOptions.setThrowOnError(true);
@@ -430,7 +422,7 @@ public class TestHiveImport extends ImportJobTestCase {
             .name(getColName(2)).type().nullable().stringType().noDefault()
             .endRecord();
     String dataSetUri = "dataset:hive:/default/" + tableName;
-    ParquetJob.createDataset(dataSetSchema, Formats.PARQUET.getDefaultCompressionType(), dataSetUri);
+    KiteParquetUtils.createDataset(dataSetSchema, KiteParquetUtils.getCompressionType(new Configuration()), dataSetUri);
   }
 
   /**
@@ -438,7 +430,7 @@ public class TestHiveImport extends ImportJobTestCase {
    */
   @Test
   public void testAppendHiveImportAsParquet() throws IOException {
-    final String TABLE_NAME = "APPEND_HIVE_IMPORT_AS_PARQUET";
+    final String TABLE_NAME = "append_hive_import_as_parquet";
     setCurTableName(TABLE_NAME);
     setNumCols(3);
     String [] types = getTypes();
@@ -448,11 +440,11 @@ public class TestHiveImport extends ImportJobTestCase {
     ImportTool tool = new ImportTool();
 
     runImportTest(TABLE_NAME, types, vals, "", args, tool);
-    verifyHiveDataset(TABLE_NAME, new Object[][]{{"test", 42, "somestring"}});
+    verifyHiveDataset(new Object[][]{{"test", 42, "somestring"}});
 
     String [] valsToAppend = { "'test2'", "4242", "'somestring2'" };
     runImportTest(TABLE_NAME, types, valsToAppend, "", args, tool);
-    verifyHiveDataset(TABLE_NAME, new Object[][] {
+    verifyHiveDataset(new Object[][] {
         {"test2", 4242, "somestring2"}, {"test", 42, "somestring"}});
   }
 

@@ -26,6 +26,8 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.List;
+
+import org.apache.sqoop.mapreduce.parquet.ParquetJobConfiguratorImplementation;
 import org.apache.sqoop.testutil.CommonArgs;
 import org.apache.sqoop.testutil.HsqldbTestServer;
 import org.apache.sqoop.manager.ConnManager;
@@ -48,13 +50,12 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.sqoop.util.ParquetReader;
 import org.junit.Before;
 import org.junit.Test;
-import org.kitesdk.data.Dataset;
-import org.kitesdk.data.DatasetReader;
-import org.kitesdk.data.Datasets;
 
-import static org.apache.avro.generic.GenericData.Record;
+import static org.apache.sqoop.mapreduce.parquet.ParquetJobConfiguratorImplementation.HADOOP;
+import static org.apache.sqoop.mapreduce.parquet.ParquetJobConfiguratorImplementation.KITE;
 import static org.junit.Assert.fail;
 
 /**
@@ -82,6 +83,8 @@ public class TestMerge extends BaseSqoopTestCase {
       Arrays.asList(new Integer(0), new Integer(0)),
       Arrays.asList(new Integer(1), new Integer(43)),
       Arrays.asList(new Integer(3), new Integer(313)));
+
+  private ParquetJobConfiguratorImplementation parquetJobConfiguratorImplementation = KITE;
 
   @Before
   public void setUp() {
@@ -115,6 +118,7 @@ public class TestMerge extends BaseSqoopTestCase {
   public SqoopOptions getSqoopOptions(Configuration conf) {
     SqoopOptions options = new SqoopOptions(conf);
     options.setConnectString(HsqldbTestServer.getDbUrl());
+    options.setParquetConfiguratorImplementation(parquetJobConfiguratorImplementation);
 
     return options;
   }
@@ -160,7 +164,14 @@ public class TestMerge extends BaseSqoopTestCase {
   }
 
   @Test
-  public void testParquetFileMerge() throws Exception {
+  public void testParquetFileMergeHadoop() throws Exception {
+    parquetJobConfiguratorImplementation = HADOOP;
+    runMergeTest(SqoopOptions.FileLayout.ParquetFile);
+  }
+
+  @Test
+  public void testParquetFileMergeKite() throws Exception {
+    parquetJobConfiguratorImplementation = KITE;
     runMergeTest(SqoopOptions.FileLayout.ParquetFile);
   }
 
@@ -298,21 +309,11 @@ public class TestMerge extends BaseSqoopTestCase {
     return false;
   }
 
-  private boolean checkParquetFileForLine(FileSystem fileSystem, Path path, List<Integer> record) throws IOException
-  {
-    Dataset<Record> parquetRecords = Datasets.load("dataset:" + path.getParent(), Record.class);
-    DatasetReader<Record> datasetReader = null;
-    try {
-      datasetReader = parquetRecords.newReader();
-      for (GenericRecord genericRecord : datasetReader) {
-        if (valueMatches(genericRecord, record)) {
-          return true;
-        }
-      }
-    }
-    finally {
-      if (datasetReader != null) {
-        datasetReader.close();
+  private boolean checkParquetFileForLine(Path path, List<Integer> record) throws IOException {
+    List<GenericRecord> resultRecords = new ParquetReader(path.getParent()).readAll();
+    for (GenericRecord resultRecord : resultRecords) {
+      if (valueMatches(resultRecord, record)) {
+        return true;
       }
     }
 
@@ -330,7 +331,7 @@ public class TestMerge extends BaseSqoopTestCase {
         result = checkAvroFileForLine(fs, p, record);
         break;
       case ParquetFile:
-        result = checkParquetFileForLine(fs, p, record);
+        result = checkParquetFileForLine(p, record);
         break;
     }
     return result;

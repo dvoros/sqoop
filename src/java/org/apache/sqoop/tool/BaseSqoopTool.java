@@ -18,6 +18,11 @@
 
 package org.apache.sqoop.tool;
 
+import static java.lang.String.format;
+import static org.apache.commons.lang3.StringUtils.isBlank;
+import static org.apache.sqoop.mapreduce.parquet.ParquetConstants.PARQUET_JOB_CONFIGURATOR_IMPLEMENTATION_KEY;
+import static org.apache.sqoop.mapreduce.parquet.ParquetJobConfiguratorImplementation.valueOf;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -35,6 +40,8 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.sqoop.manager.SupportedManagers;
 import org.apache.sqoop.mapreduce.hcat.SqoopHCatUtilities;
+import org.apache.sqoop.mapreduce.parquet.ParquetJobConfiguratorFactory;
+import org.apache.sqoop.mapreduce.parquet.ParquetJobConfiguratorImplementation;
 import org.apache.sqoop.util.CredentialsUtil;
 import org.apache.sqoop.util.LoggingUtils;
 import org.apache.sqoop.util.password.CredentialProviderHelper;
@@ -95,6 +102,7 @@ public abstract class BaseSqoopTool extends org.apache.sqoop.tool.SqoopTool {
   public static final String TARGET_DIR_ARG = "target-dir";
   public static final String APPEND_ARG = "append";
   public static final String DELETE_ARG = "delete-target-dir";
+  public static final String DELETE_COMPILE_ARG = "delete-compile-dir";
   public static final String NULL_STRING = "null-string";
   public static final String INPUT_NULL_STRING = "input-null-string";
   public static final String NULL_NON_STRING = "null-non-string";
@@ -131,6 +139,9 @@ public abstract class BaseSqoopTool extends org.apache.sqoop.tool.SqoopTool {
   public static final String HCATALOG_STORAGE_STANZA_ARG =
     "hcatalog-storage-stanza";
   public static final String HCATALOG_HOME_ARG = "hcatalog-home";
+  public static final String HS2_URL_ARG = "hs2-url";
+  public static final String HS2_USER_ARG = "hs2-user";
+  public static final String HS2_KEYTAB_ARG = "hs2-keytab";
   public static final String MAPREDUCE_JOB_NAME = "mapreduce-job-name";
   public static final String NUM_MAPPERS_ARG = "num-mappers";
   public static final String NUM_MAPPERS_SHORT_ARG = "m";
@@ -175,6 +186,7 @@ public abstract class BaseSqoopTool extends org.apache.sqoop.tool.SqoopTool {
   public static final String THROW_ON_ERROR_ARG = "throw-on-error";
   public static final String ORACLE_ESCAPING_DISABLED = "oracle-escaping-disabled";
   public static final String ESCAPE_MAPPING_COLUMN_NAMES_ENABLED = "escape-mapping-column-names";
+  public static final String PARQUET_CONFIGURATOR_IMPLEMENTATION = "parquet-configurator-implementation";
 
   // Arguments for validation.
   public static final String VALIDATE_ARG = "validate";
@@ -609,6 +621,21 @@ public abstract class BaseSqoopTool extends org.apache.sqoop.tool.SqoopTool {
           + " types.")
         .withLongOpt(MAP_COLUMN_HIVE)
         .create());
+    hiveOpts.addOption(OptionBuilder
+        .hasArg()
+        .withDescription("The URL to the HiveServer2.")
+        .withLongOpt(HS2_URL_ARG)
+        .create());
+    hiveOpts.addOption(OptionBuilder
+        .hasArg()
+        .withDescription("The user/principal for HiveServer2.")
+        .withLongOpt(HS2_USER_ARG)
+        .create());
+    hiveOpts.addOption(OptionBuilder
+        .hasArg()
+        .withDescription("The location of the keytab of the HiveServer2 user.")
+        .withLongOpt(HS2_KEYTAB_ARG)
+        .create());
 
     return hiveOpts;
   }
@@ -778,6 +805,10 @@ public abstract class BaseSqoopTool extends org.apache.sqoop.tool.SqoopTool {
         .hasArg()
         .withDescription("Output directory for compiled objects")
         .withLongOpt(BIN_OUT_DIR_ARG)
+        .create());
+    codeGenOpts.addOption(OptionBuilder
+        .withDescription("Delete compile directory")
+        .withLongOpt(DELETE_COMPILE_ARG)
         .create());
     codeGenOpts.addOption(OptionBuilder.withArgName("name")
         .hasArg()
@@ -1122,6 +1153,8 @@ public abstract class BaseSqoopTool extends org.apache.sqoop.tool.SqoopTool {
       out.setEscapeMappingColumnNamesEnabled(Boolean.parseBoolean(in.getOptionValue(
           ESCAPE_MAPPING_COLUMN_NAMES_ENABLED)));
     }
+
+    applyParquetJobConfigurationImplementation(in, out);
   }
 
   private void applyCredentialsOptions(CommandLine in, SqoopOptions out)
@@ -1237,6 +1270,15 @@ public abstract class BaseSqoopTool extends org.apache.sqoop.tool.SqoopTool {
    }
    if (in.hasOption(HIVE_EXTERNAL_TABLE_LOCATION_ARG)) {
      out.setHiveExternalTableDir(in.getOptionValue(HIVE_EXTERNAL_TABLE_LOCATION_ARG));
+   }
+   if (in.hasOption(HS2_URL_ARG)) {
+      out.setHs2Url(in.getOptionValue(HS2_URL_ARG));
+   }
+   if (in.hasOption(HS2_USER_ARG)) {
+      out.setHs2User(in.getOptionValue(HS2_USER_ARG));
+   }
+   if (in.hasOption(HS2_KEYTAB_ARG)) {
+      out.setHs2Keytab(in.getOptionValue(HS2_KEYTAB_ARG));
    }
 
   }
@@ -1384,6 +1426,10 @@ public abstract class BaseSqoopTool extends org.apache.sqoop.tool.SqoopTool {
 
     if (in.hasOption(BIN_OUT_DIR_ARG)) {
       out.setJarOutputDir(in.getOptionValue(BIN_OUT_DIR_ARG));
+    }
+
+    if (in.hasOption(DELETE_COMPILE_ARG)) {
+      out.setDeleteJarOutputDir(true);
     }
 
     if (in.hasOption(PACKAGE_NAME_ARG)) {
@@ -1618,6 +1664,8 @@ public abstract class BaseSqoopTool extends org.apache.sqoop.tool.SqoopTool {
       throw new InvalidOptionsException("Importing to external Hive table requires --hive-import parameter to be set."
           + HELP_STR);
     }
+
+    validateHS2Options(options);
   }
 
   protected void validateAccumuloOptions(SqoopOptions options)
@@ -1851,5 +1899,50 @@ public abstract class BaseSqoopTool extends org.apache.sqoop.tool.SqoopTool {
           "Was called with the --direct option, but no direct connector available.");
     }
   }
-}
 
+  protected void validateHS2Options(SqoopOptions options) throws SqoopOptions.InvalidOptionsException {
+    final String withoutTemplate = "The %s option cannot be used without the %s option.";
+    final String withTemplate = "The %s option cannot be used with the %s option.";
+
+    if (isSet(options.getHs2Url()) && !options.doHiveImport()) {
+      throw new InvalidOptionsException(format(withoutTemplate, HS2_URL_ARG, HIVE_IMPORT_ARG));
+    }
+
+    if (isSet(options.getHs2User()) && !isSet(options.getHs2Url())) {
+      throw  new InvalidOptionsException(format(withoutTemplate, HS2_USER_ARG, HS2_URL_ARG));
+    }
+
+    if (isSet(options.getHs2Keytab()) && !isSet(options.getHs2User())) {
+      throw  new InvalidOptionsException(format(withoutTemplate, HS2_KEYTAB_ARG, HS2_USER_ARG));
+    }
+
+    if (isSet(options.getHs2Url()) && (options.getFileLayout() == SqoopOptions.FileLayout.ParquetFile)) {
+      throw  new InvalidOptionsException(format(withTemplate, HS2_URL_ARG, FMT_PARQUETFILE_ARG));
+    }
+
+  }
+
+  private void applyParquetJobConfigurationImplementation(CommandLine in, SqoopOptions out) throws InvalidOptionsException {
+    String optionValue = in.getOptionValue(PARQUET_CONFIGURATOR_IMPLEMENTATION);
+    String propertyValue = out.getConf().get(PARQUET_JOB_CONFIGURATOR_IMPLEMENTATION_KEY);
+
+    String valueToUse = isBlank(optionValue) ? propertyValue : optionValue;
+
+    if (isBlank(valueToUse)) {
+      LOG.debug("Parquet job configurator implementation is not set, using default value: " + out.getParquetConfiguratorImplementation());
+      return;
+    }
+
+    try {
+      ParquetJobConfiguratorImplementation parquetConfiguratorImplementation = valueOf(valueToUse.toUpperCase());
+      out.setParquetConfiguratorImplementation(parquetConfiguratorImplementation);
+      LOG.debug("Parquet job configurator implementation set: " + parquetConfiguratorImplementation);
+    } catch (IllegalArgumentException e) {
+      throw new InvalidOptionsException(format("Invalid Parquet job configurator implementation is set: %s. Supported values are: %s", valueToUse, Arrays.toString(ParquetJobConfiguratorImplementation.values())));
+    }
+  }
+
+  public ParquetJobConfiguratorFactory getParquetJobConfigurator(SqoopOptions sqoopOptions) {
+    return sqoopOptions.getParquetConfiguratorImplementation().createFactory();
+  }
+}

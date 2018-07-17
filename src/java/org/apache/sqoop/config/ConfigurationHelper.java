@@ -238,6 +238,12 @@ public final class ConfigurationHelper {
       .get(ConfigurationConstants.PROP_MAPREDUCE_FRAMEWORK_NAME))) {
       return false;
     }
+    if ("local".equalsIgnoreCase(conf
+        .get(ConfigurationConstants.PROP_MAPREDUCE_FRAMEWORK_NAME))) {
+      return true;
+    }
+
+    // Removed in Hadoop3, kept for backwards compatibility:
     String jtAddr = conf
       .get(ConfigurationConstants.PROP_MAPRED_JOB_TRACKER_ADDRESS);
     String jtAddr2 = conf
@@ -248,5 +254,14 @@ public final class ConfigurationHelper {
 
   private ConfigurationHelper() {
     // Disable explicit object creation
+  }
+
+  public static Integer getIntegerConfigIfExists(Configuration conf, String key) {
+    Integer config = null;
+    String configString = conf.get(key, null);
+    if (configString != null) {
+      config = Integer.valueOf(configString);
+    }
+    return config;
   }
 }

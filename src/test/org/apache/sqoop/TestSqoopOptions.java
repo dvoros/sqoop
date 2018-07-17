@@ -90,6 +90,7 @@ public class TestSqoopOptions {
     excludedFieldsFromClone.add("layout");
     excludedFieldsFromClone.add("activeSqoopTool");
     excludedFieldsFromClone.add("hbaseNullIncrementalMode");
+    excludedFieldsFromClone.add("parquetConfiguratorImplementation");
   }
 
   @After
@@ -857,6 +858,7 @@ public class TestSqoopOptions {
   @Test
   public void testSqoopOptionsCloneIsEqual() throws Exception {
     SqoopOptions options = createSqoopOptionsFilledWithRandomData();
+    options.getConf().setAllowNullValueProperties(false); // always false in cloned conf
     SqoopOptions clonedOptions = (SqoopOptions) options.clone();
     assertThat(options).isEqualToComparingFieldByFieldRecursively(clonedOptions);
   }

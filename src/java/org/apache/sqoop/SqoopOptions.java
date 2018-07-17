@@ -36,6 +36,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.sqoop.accumulo.AccumuloConstants;
 import org.apache.sqoop.mapreduce.mainframe.MainframeConfiguration;
+import org.apache.sqoop.mapreduce.parquet.ParquetJobConfiguratorImplementation;
 import org.apache.sqoop.tool.BaseSqoopTool;
 import org.apache.sqoop.util.CredentialsUtil;
 import org.apache.sqoop.util.LoggingUtils;
@@ -52,6 +53,7 @@ import org.apache.sqoop.util.RandomHash;
 import org.apache.sqoop.util.StoredAsProperty;
 
 import static org.apache.sqoop.Sqoop.SQOOP_RETHROW_PROPERTY;
+import static org.apache.sqoop.mapreduce.parquet.ParquetJobConfiguratorImplementation.KITE;
 import static org.apache.sqoop.orm.ClassWriter.toJavaIdentifier;
 
 /**
@@ -202,6 +204,7 @@ public class SqoopOptions implements Cloneable {
 
   @StoredAsProperty("codegen.output.dir") private String codeOutputDir;
   @StoredAsProperty("codegen.compile.dir") private String jarOutputDir;
+  @StoredAsProperty("codegen.delete.compile.dir") private boolean deleteJarOutputDir;
   // Boolean specifying whether jarOutputDir is a nonce tmpdir (true), or
   // explicitly set by the user (false). If the former, disregard any value
   // for jarOutputDir saved in the metastore.
@@ -448,6 +451,18 @@ public class SqoopOptions implements Cloneable {
   private String metaConnectStr;
   private String metaUsername;
   private String metaPassword;
+
+  @StoredAsProperty("hs2.url")
+  private String hs2Url;
+
+  @StoredAsProperty("hs2.user")
+  private String hs2User;
+
+  @StoredAsProperty("hs2.keytab")
+  private String hs2Keytab;
+
+  @StoredAsProperty("parquet.configurator.implementation")
+  private ParquetJobConfiguratorImplementation parquetConfiguratorImplementation;
 
   public SqoopOptions() {
     initDefaults(null);
@@ -713,7 +728,7 @@ public class SqoopOptions implements Cloneable {
                 props.getProperty(propName, f.get(this).toString())));
           }  else if (typ.equals(Map.class)) {
             f.set(this,
-                SqoopJsonUtil.getMapforJsonString(props.getProperty(propName)));
+                SqoopJsonUtil.getMapForJsonString(props.getProperty(propName)));
           } else {
             throw new RuntimeException("Could not retrieve property "
                 + propName + " for type: " + typ);
@@ -840,7 +855,7 @@ public class SqoopOptions implements Cloneable {
             putProperty(
                 props,
                 propName,
-                SqoopJsonUtil.getJsonStringforMap((Map) f.get(this)));
+                SqoopJsonUtil.getJsonStringForMap((Map) f.get(this)));
           } else {
             throw new RuntimeException("Could not set property "
                 + propName + " for type: " + typ);
@@ -1072,6 +1087,8 @@ public class SqoopOptions implements Cloneable {
     this.jarOutputDir = getNonceJarDir(tmpDir + "sqoop-" + localUsername
         + "/compile");
     this.jarDirIsAuto = true;
+    // Default to false, so behaviour does not change
+    this.deleteJarOutputDir = false;
     this.layout = FileLayout.TextFile;
 
     this.areOutputDelimsManuallySet = false;
@@ -1143,6 +1160,8 @@ public class SqoopOptions implements Cloneable {
 
     // set escape column mapping to true
     this.escapeColumnMappingEnabled = true;
+
+    this.parquetConfiguratorImplementation = KITE;
   }
 
   /**
@@ -1688,6 +1707,17 @@ public class SqoopOptions implements Cloneable {
   public void setJarOutputDir(String outDir) {
     this.jarOutputDir = outDir;
     this.jarDirIsAuto = false;
+  }
+
+  /**
+   * @return boolean - whether or not to delete the compile JAR directory
+   */
+  public Boolean getDeleteJarOutputDir() {
+    return this.deleteJarOutputDir;
+  }
+
+  public void setDeleteJarOutputDir(Boolean delete) {
+    this.deleteJarOutputDir = delete;
   }
 
   /**
@@ -2892,5 +2922,36 @@ public class SqoopOptions implements Cloneable {
     this.metaPassword = metaPassword;
   }
 
+  public String getHs2Url() {
+    return hs2Url;
+  }
+
+  public void setHs2Url(String hs2Url) {
+    this.hs2Url = hs2Url;
+  }
+
+  public String getHs2User() {
+    return hs2User;
+  }
+
+  public void setHs2User(String hs2User) {
+    this.hs2User = hs2User;
+  }
+
+  public String getHs2Keytab() {
+    return hs2Keytab;
+  }
+
+  public void setHs2Keytab(String hs2Keytab) {
+    this.hs2Keytab = hs2Keytab;
+  }
+
+  public ParquetJobConfiguratorImplementation getParquetConfiguratorImplementation() {
+    return parquetConfiguratorImplementation;
+  }
+
+  public void setParquetConfiguratorImplementation(ParquetJobConfiguratorImplementation parquetConfiguratorImplementation) {
+    this.parquetConfiguratorImplementation = parquetConfiguratorImplementation;
+  }
 }
 
